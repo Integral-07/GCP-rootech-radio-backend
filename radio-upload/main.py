@@ -16,7 +16,10 @@ YOUTUBE_REFRESH_TOKEN = os.environ.get("YOUTUBE_REFRESH_TOKEN")
 SITE_URL = os.environ.get("SITE_URL", "https://rootechradio.web.app")
 
 TOKEN_URI = "https://oauth2.googleapis.com/token"
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube",
+]
 
 WEEKDAY_NAMES = [
     "monday", "tuesday", "wednesday", "thursday",
@@ -87,7 +90,7 @@ def upload_video(request):
             "categoryId": "28",
         },
         "status": {
-            "privacyStatus": "unlisted",
+            "privacyStatus": "public",
         },
     }
 
