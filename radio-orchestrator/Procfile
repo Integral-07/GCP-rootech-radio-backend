@@ -1,0 +1,1 @@
+web: functions-framework --target=run_pipeline --port=8080

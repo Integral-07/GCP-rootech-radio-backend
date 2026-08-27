@@ -1,0 +1,1 @@
+web: functions-framework --target=upload_video --port=8080

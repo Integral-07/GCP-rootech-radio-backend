@@ -1,0 +1,11 @@
+# 機密情報を含む可能性のあるファイル
+env-vars.yaml
+*.json
+!package.json
+
+# Pythonキャッシュ
+__pycache__/
+*.pyc
+
+# OS/エディタ系
+.DS_Store

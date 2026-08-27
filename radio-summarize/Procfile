@@ -1,0 +1,1 @@
+web: functions-framework --target=generate_script --port=8080

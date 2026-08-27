@@ -1,0 +1,1 @@
+web: functions-framework --target=collect_rss --port=8080
