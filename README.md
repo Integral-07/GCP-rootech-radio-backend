@@ -1,4 +1,4 @@
-![](https://img.shields.io/badge/Google Cloud Platform-yellow)
+![](https://img.shields.io/badge/GoogleCloudPlatform-yellow)
 ![](https://img.shields.io/badge/状態-リリース-blue)
 ![](https://img.shields.io/badge/build-passing-green)
 
