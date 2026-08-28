@@ -69,6 +69,9 @@ def clean_for_tts(text: str) -> str:
     text = re.sub(r"\*(.+?)\*", r"\1", text)
     text = re.sub(r"__(.+?)__", r"\1", text)
     text = re.sub(r"(?<!\w)_(.+?)_(?!\w)", r"\1", text)
+    # 水平線・区切り線(---, ***, ___ が3個以上、行全体を占める行)を除去。
+    # 除去せずTTSに渡すと、記号の連続がノイズ的な音として発音されることがある
+    text = re.sub(r"^\s*([-*_])\1{2,}\s*$\n?", "", text, flags=re.MULTILINE)
     text = re.sub(r"^#{1,6}\s*.*$\n?", "", text, flags=re.MULTILINE)
     text = re.sub(r"^[\-\*・]\s+", "", text, flags=re.MULTILINE)
     text = re.sub(r"`{1,3}(.+?)`{1,3}", r"\1", text, flags=re.DOTALL)
@@ -132,6 +135,7 @@ def run_pipeline(request):
         return {"status": "error", "failed_step": "summarize", "steps": steps}, 502
 
     script_text = summarize_result.get("script_text", "")
+    script_text_tts = summarize_result.get("script_text_tts", script_text)
     if summarize_result.get("warning"):
         notify_discord(f"step=summarize warning={summarize_result.get('warning')}", "WARN")
     notify_discord(
@@ -147,7 +151,7 @@ def run_pipeline(request):
         return result
 
     notify_discord("step=tts status=start", "INFO")
-    tts_text = clean_for_tts(script_text)
+    tts_text = clean_for_tts(script_text_tts)
     tts_result = call_service(TTS_SERVICE_URL, {"text": tts_text, "filename": audio_filename})
     steps["tts"] = {
         "status": tts_result.get("status"),
