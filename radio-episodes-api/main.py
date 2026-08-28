@@ -1,9 +1,10 @@
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import functions_framework
 from google.cloud import firestore
 
+JST = timezone(timedelta(hours=9))
 ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "*")
 
 db = firestore.Client()
@@ -42,30 +43,18 @@ def get_episodes(request):
     path = request.path.strip("/")
 
     if path == "today" or path == "":
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_str = datetime.now(JST).strftime("%Y-%m-%d")
         docs = db.collection("episodes").where("date", "==", today_str).stream()
         episodes = [_episode_to_dict(doc) for doc in docs]
         if not episodes:
             return ({"error": "本日のエピソードはまだありません", "episodes": []}, 404, headers)
         return ({"episodes": episodes, "count": len(episodes)}, 200, headers)
 
-    if path == "episodes":
-        limit = int(request.args.get("limit", 20))
-        docs = (
-            db.collection("episodes")
-            .order_by("published_at", direction=firestore.Query.DESCENDING)
-            .limit(limit)
-            .stream()
+    if path == "episodes" or path.startswith("episodes/"):
+        return (
+            {"error": "このエンドポイントは現在利用できません"},
+            403,
+            headers,
         )
-        episodes = [_episode_to_dict(doc) for doc in docs]
-        return ({"episodes": episodes, "count": len(episodes)}, 200, headers)
-
-    if path.startswith("episodes/"):
-        date_str = path.split("/", 1)[1]
-        docs = db.collection("episodes").where("date", "==", date_str).stream()
-        episodes = [_episode_to_dict(doc) for doc in docs]
-        if not episodes:
-            return ({"error": f"指定日のエピソードが見つかりません: {date_str}", "episodes": []}, 404, headers)
-        return ({"episodes": episodes, "count": len(episodes)}, 200, headers)
 
     return ({"error": "不明なパスです"}, 404, headers)

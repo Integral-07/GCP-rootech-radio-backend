@@ -1,11 +1,13 @@
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 import functions_framework
 import google.auth.transport.requests
 import google.oauth2.id_token
 import requests
+
+JST = timezone(timedelta(hours=9))
 
 RSS_SERVICE_URL = os.environ.get("RSS_SERVICE_URL", "")
 SUMMARIZE_SERVICE_URL = os.environ.get("SUMMARIZE_SERVICE_URL", "")
@@ -20,7 +22,7 @@ CALL_TIMEOUT_SECONDS = 1800
 def notify_discord(message: str, level: str = "INFO") -> None:
     if not DISCORD_WEBHOOK_URL:
         return
-    timestamp = datetime.now().strftime("%H:%M:%S")
+    timestamp = datetime.now(JST).strftime("%H:%M:%S")
     line = f"[{timestamp}] [{level}] {message}"
     try:
         requests.post(
@@ -82,7 +84,7 @@ def run_pipeline(request):
     feed_urls = request_json.get("feed_urls", [])
     day_of_week = request_json.get("day_of_week", "")
 
-    date_str = datetime.now().strftime("%Y%m%d")
+    date_str = datetime.now(JST).strftime("%Y%m%d")
     base_filename = f"{date_str}_{topic or 'episode'}".replace(" ", "_")
     script_filename = f"{base_filename}.txt"
     audio_filename = f"{base_filename}.mp3"
@@ -197,7 +199,7 @@ def run_pipeline(request):
         notify_discord("step=upload status=skipped reason=UPLOAD_SERVICE_URL_unset", "INFO")
         return result
 
-    date_display = datetime.now().strftime("%Y/%m/%d")
+    date_display = datetime.now(JST).strftime("%Y/%m/%d")
 
     notify_discord("step=upload status=start", "INFO")
     upload_result = call_service(
@@ -214,6 +216,7 @@ def run_pipeline(request):
     steps["upload"] = {
         "status": upload_result.get("status"),
         "youtube_url": upload_result.get("youtube_url"),
+        "playlist_result": upload_result.get("playlist_result"),
     }
     if upload_result.get("status") != "success":
         steps["upload"]["detail"] = upload_result
@@ -222,8 +225,11 @@ def run_pipeline(request):
         return result
 
     result["youtube_url"] = upload_result.get("youtube_url")
+    playlist_info = upload_result.get("playlist_result") or {}
     notify_discord(
-        f"step=upload status=ok url={upload_result.get('youtube_url')}",
+        f"step=upload status=ok url={upload_result.get('youtube_url')} "
+        f"playlist_status={playlist_info.get('status')} "
+        f"playlist_id={playlist_info.get('playlist_id', '-')}",
         "INFO",
     )
     notify_discord(f"pipeline finished topic=\"{topic}\" status=success", "INFO")
