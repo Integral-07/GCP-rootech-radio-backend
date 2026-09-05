@@ -1,3 +1,26 @@
+"""
+Cloud Run用: パイプライン全体(RSS収集→原稿生成→TTS→動画化→YouTube投稿)を
+順番に呼び出すオーケストレーター。途中失敗時は start_step を指定して
+そのステップから再開できる。
+
+デプロイ後、HTTPリクエストで呼び出す想定:
+  POST https://REGION-PROJECT_ID.run.app
+  Body (JSON): {
+    "topic": "AI・機械学習",
+    "feed_urls": ["https://...", ...],
+    "day_of_week": "monday",
+    "start_step": "upload",
+    "script_filename": "...",
+    "audio_filename": "...",
+    "video_filename": "...",
+    "sources": [...]
+  }
+
+環境変数:
+  - RSS_SERVICE_URL, SUMMARIZE_SERVICE_URL, TTS_SERVICE_URL,
+    VIDEO_SERVICE_URL, UPLOAD_SERVICE_URL, BUCKET_NAME
+"""
+
 import base64
 import json
 import os
@@ -64,15 +87,13 @@ def notify_discord(message: str, level: str = "INFO", retry_url: str = "") -> No
         content += f"\ncontinue pipeline: <{retry_url}>"
     payload = {"content": content}
     try:
-        resp = requests.post(
+        requests.post(
             DISCORD_WEBHOOK_URL,
             json=payload,
             timeout=10,
         )
-        if resp.status_code >= 400:
-            print(f"[notify_discord] Discord API error: {resp.status_code} {resp.text}")
-    except requests.RequestException as e:
-        print(f"[notify_discord] request failed: {e}")
+    except requests.RequestException:
+        pass
 
 
 def get_id_token(target_url: str) -> str:
@@ -125,6 +146,29 @@ def fetch_script_from_gcs(filename: str) -> str:
     return blob.download_as_text()
 
 
+def save_sources_to_gcs(sources_filename: str, sources: list) -> None:
+    try:
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(BUCKET_NAME)
+        blob = bucket.blob(sources_filename)
+        blob.upload_from_string(
+            json.dumps(sources, ensure_ascii=False),
+            content_type="application/json; charset=utf-8",
+        )
+    except Exception as e:
+        print(f"[save_sources_to_gcs] failed: {e}")
+
+
+def fetch_sources_from_gcs(sources_filename: str) -> list:
+    try:
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(BUCKET_NAME)
+        blob = bucket.blob(sources_filename)
+        return json.loads(blob.download_as_text())
+    except Exception:
+        return []
+
+
 @functions_framework.http
 def run_pipeline(request):
     request_json = request.get_json(silent=True) or {}
@@ -142,6 +186,7 @@ def run_pipeline(request):
     script_filename = request_json.get("script_filename") or f"{base_filename}.txt"
     audio_filename = request_json.get("audio_filename") or f"{base_filename}.mp3"
     video_filename = request_json.get("video_filename") or f"{base_filename}.mp4"
+    sources_filename = f"{base_filename}.sources.json"
 
     steps = {}
     articles = []
@@ -191,6 +236,9 @@ def run_pipeline(request):
             for a in articles
             if a.get("url")
         ]
+        save_sources_to_gcs(sources_filename, sources)
+    elif step_index >= STEP_ORDER.index("tts") and not sources:
+        sources = fetch_sources_from_gcs(sources_filename)
 
     if step_index <= STEP_ORDER.index("summarize"):
         if not SUMMARIZE_SERVICE_URL:
