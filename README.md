@@ -1,4 +1,8 @@
-# GCP Rootech Radio Backend
+![](https://img.shields.io/badge/GoogleCloudPlatform-yellow)
+![](https://img.shields.io/badge/状態-リリース-blue)
+![](https://img.shields.io/badge/build-passing-green)
+
+# Rootech Radio Maker & Uploader
 
 「Rootech Radio(ルーテックラジオ)」のバックエンドパイプライン一式です。
 RSS収集からAI原稿生成、音声合成、動画化、YouTube投稿、Firestore保存まで、
